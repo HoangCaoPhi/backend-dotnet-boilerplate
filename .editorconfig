@@ -1,0 +1,9 @@
+root = true
+
+[*.cs]
+# EnforceCodeStyleInBuild turns every default-severity IDE-style rule into a build message.
+# Keep the whole Style category quiet by default, then opt individual rules into `error`
+# explicitly — otherwise a repo-wide style sweep would be needed just to keep building.
+dotnet_analyzer_diagnostic.category-Style.severity = suggestion
+
+dotnet_diagnostic.IDE0290.severity = error

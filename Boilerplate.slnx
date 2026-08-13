@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Boilerplate.Api/Boilerplate.Api.csproj" />
+    <Project Path="src/Boilerplate.Application/Boilerplate.Application.csproj" />
+    <Project Path="src/Boilerplate.Domain/Boilerplate.Domain.csproj" />
+    <Project Path="src/Boilerplate.Infrastructure/Boilerplate.Infrastructure.csproj" />
+    <Project Path="src/Boilerplate.SharedKernel/Boilerplate.SharedKernel.csproj" />
+  </Folder>
+</Solution>

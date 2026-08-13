@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [ 
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Write(src/**/*.cs)",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/remind-check-rules.sh\""
+          },
+          {
+            "type": "command",
+            "if": "Edit(src/**/*.cs)",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/remind-check-rules.sh\""
+          }
+        ]
+      }
+    ]
+  }
+}

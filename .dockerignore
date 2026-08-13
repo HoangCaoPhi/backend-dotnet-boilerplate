@@ -1,0 +1,11 @@
+**/bin/
+**/obj/
+.git
+.gitignore
+.editorconfig
+.claude/
+temp/
+docs/
+tests/
+README.md
+CLAUDE.md
