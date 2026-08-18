@@ -3,7 +3,7 @@ paths:
   - "src/**/*.cs"
 ---
 
-# Domain Model (DDD tactical patterns)
+# DDD (tactical patterns)
 
 ## Entity & Aggregate
 
@@ -12,13 +12,13 @@ paths:
   (getter/setter bags) except for genuinely simple CRUD aggregates.
 - No public setters — every mutation goes through an explicit method named after the ubiquitous
   language, never assigned directly.
-- Child collections are exposed as `IReadOnlyCollection<T>` backed by a private field; mutated
-  only through aggregate root/entity methods, never directly by callers.
+- Child collections are exposed as `IReadOnlyCollection<T>` backed by a private field; mutated only
+  through aggregate root/entity methods, never directly by callers.
 - Aggregate boundary is defined by transactional consistency needs, not by convenience grouping.
 - Aggregate root is the sole entry point and consistency guardian — no creating/mutating a child
   entity from outside the aggregate.
-- No direct navigation between aggregates — cross-aggregate references are foreign-key IDs only,
-  no EF navigation property crossing an aggregate boundary.
+- No direct navigation between aggregates — cross-aggregate references are foreign-key IDs only, no
+  EF navigation property crossing an aggregate boundary.
 - Mark aggregate roots with the `IAggregateRoot` marker interface.
 
 ## Value Object
@@ -40,23 +40,27 @@ paths:
 - Invariants are enforced by the entity itself (constructor/methods) — an entity must never exist
   in an invalid state. Throw on violation (`?? throw new ArgumentNullException(...)`), and never
   leave a partial mutation applied before throwing.
-- Domain exceptions guard invariants (should-never-happen); expected business outcomes are
-  `Result<T>` — `architecture.md`.
+- Domain exceptions guard invariants: things that should never happen once Application has
+  validated. Expected business outcomes (validation, not found, conflict) are never thrown — they
+  travel back as `Result`/`Result<T>` (SharedKernel) carrying an `Error`.
 - FluentValidation checks the command DTO at the field level (`ValidationBehavior` in the Mediator
   pipeline); domain invariants are checked again inside the entity.
 
 ## CQRS: query bypasses the aggregate
 
-- Aggregate boundaries apply to writes only. Queries bypass them freely — a query DTO can join
-  data across multiple aggregates/tables via `IReadApplicationDbContext` LINQ projection, never
-  through a repository.
+- Aggregate boundaries apply to writes only. Queries bypass them freely — a query DTO can join data
+  across multiple aggregates/tables via `IReadApplicationDbContext` LINQ projection, never through
+  a repository.
 
 ## Domain events
 
 - Naming: past-tense verb (`OrderStartedDomainEvent`), immutable data holder.
 - Raised on the entity, never published from a command handler — the `SaveChanges` interceptor
   dispatches them.
-- Handlers live in the Application layer, never in Domain.
+- Never serialized, never leaves the transaction; anything crossing the process boundary is an
+  integration event instead — `architecture.md`.
+- Handlers live in the Application layer, never in Domain, and run inside the transaction: they may
+  query the database and enqueue to the outbox, never call out over the network.
 - One command → exactly one handler. One domain event → zero or more handlers. When an event has
   2+ handlers, name each by the action it performs (`<Action>When<Event>DomainEventHandler`), not
   by the event name (that would collide) — a single-handler event may keep the short

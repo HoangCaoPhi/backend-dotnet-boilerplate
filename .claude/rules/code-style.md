@@ -35,8 +35,8 @@ paths:
 - High cohesion, low coupling: group tightly related code in one file/folder; minimize coupling
   between unrelated components; no dependency against the architecture direction.
 - Clean Code + YAGNI: no over-engineering, no unused abstractions/features.
-- Comments: default to none. Every comment is a small failure to express something in code, so
-  only add one when the code truly cannot say it itself. Litmus test before writing one — is this
+- Comments: default to none. Every comment is a small failure to express something in code, so only
+  add one when the code truly cannot say it itself. Litmus test before writing one — is this
   explaining a fact about the world the code can't express (keep), or justifying why this design
   was chosen over an alternative (delete, it's PR/rule-doc material, not code)? If the comment
   would still make sense as a bullet in a PR description, it doesn't belong in the file.

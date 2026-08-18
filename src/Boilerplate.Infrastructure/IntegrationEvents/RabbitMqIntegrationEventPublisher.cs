@@ -19,6 +19,7 @@ public sealed class RabbitMqIntegrationEventPublisher(IConnection connection)
     public async Task PublishAsync(
         IIntegrationEvent integrationEvent,
         Guid messageId,
+        DateTimeOffset occurredOn,
         CancellationToken cancellationToken)
     {
         var exchangeName = integrationEvent.GetType().Name;
@@ -32,6 +33,7 @@ public sealed class RabbitMqIntegrationEventPublisher(IConnection connection)
         {
             Persistent = true,
             MessageId = messageId.ToString(),
+            Timestamp = new AmqpTimestamp(occurredOn.ToUnixTimeSeconds()),
             Type = exchangeName,
             ContentType = "application/json",
         };

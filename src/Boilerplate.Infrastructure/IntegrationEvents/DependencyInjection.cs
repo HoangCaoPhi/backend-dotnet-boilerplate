@@ -11,8 +11,6 @@ public static class DependencyInjection
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        IntegrationEventTypeRegistry.EnsureValid();
-
         services.AddScoped<IIntegrationEventPublisher, RabbitMqIntegrationEventPublisher>();
 
         services.AddSingleton<IConnection>(_ =>

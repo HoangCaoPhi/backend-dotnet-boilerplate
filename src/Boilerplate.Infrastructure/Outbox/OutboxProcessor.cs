@@ -1,7 +1,8 @@
 using System.Text.Json;
 using Boilerplate.Application.Common.IntegrationEvents;
-using Boilerplate.Infrastructure.IntegrationEvents;
+using Boilerplate.Application.Common.Outbox;
 using Boilerplate.Infrastructure.Persistence;
+using Mediator;
 using Boilerplate.SharedKernel;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -54,7 +55,6 @@ public sealed class OutboxProcessor(
     {
         using var scope = serviceScopeFactory.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        var publisher = scope.ServiceProvider.GetRequiredService<IIntegrationEventPublisher>();
 
         await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
 
@@ -69,8 +69,8 @@ public sealed class OutboxProcessor(
 
         foreach (var message in messages)
         {
-            await PublishAsync(
-                publisher,
+            await DeliverAsync(
+                scope.ServiceProvider,
                 message,
                 cancellationToken);
         }
@@ -81,8 +81,8 @@ public sealed class OutboxProcessor(
         LogBacklog(messages);
     }
 
-    private async Task PublishAsync(
-        IIntegrationEventPublisher publisher,
+    private async Task DeliverAsync(
+        IServiceProvider serviceProvider,
         OutboxMessage message,
         CancellationToken cancellationToken)
     {
@@ -90,9 +90,10 @@ public sealed class OutboxProcessor(
 
         try
         {
-            await publisher.PublishAsync(
+            await DispatchAsync(
+                serviceProvider,
                 Deserialize(message),
-                message.Id,
+                message,
                 cancellationToken);
 
             message.MarkPublished(timeProvider.GetUtcNow());
@@ -103,13 +104,62 @@ public sealed class OutboxProcessor(
                 exception.Message,
                 MaxAttempts);
 
-            logger.LogError(
+            LogFailure(
                 exception,
-                "Failed to publish outbox message {MessageId} ({MessageType}), attempt {Attempts}",
+                message);
+        }
+    }
+
+    private static async Task DispatchAsync(
+        IServiceProvider serviceProvider,
+        IOutboxMessage payload,
+        OutboxMessage message,
+        CancellationToken cancellationToken)
+    {
+        switch (payload)
+        {
+            case IIntegrationEvent integrationEvent:
+                await serviceProvider.GetRequiredService<IIntegrationEventPublisher>().PublishAsync(
+                    integrationEvent,
+                    message.Id,
+                    message.OccurredOn,
+                    cancellationToken);
+                break;
+
+            case IEventualCommand eventualCommand:
+                await serviceProvider.GetRequiredService<ISender>().Send(
+                    eventualCommand,
+                    cancellationToken);
+                break;
+
+            default:
+                throw new InvalidOperationException(
+                    $"Outbox message '{payload.GetType().Name}' is neither an integration event nor an eventual command.");
+        }
+    }
+
+    private void LogFailure(
+        Exception exception,
+        OutboxMessage message)
+    {
+        if (message.Status == OutboxMessageStatus.DeadLettered)
+        {
+            logger.LogCritical(
+                exception,
+                "Dead-lettered outbox message {MessageId} ({MessageType}) after {Attempts} attempts",
                 message.Id,
                 message.Type,
                 message.Attempts);
+
+            return;
         }
+
+        logger.LogError(
+            exception,
+            "Failed to deliver outbox message {MessageId} ({MessageType}), attempt {Attempts}",
+            message.Id,
+            message.Type,
+            message.Attempts);
     }
 
     private async Task PurgeAsync(CancellationToken cancellationToken)
@@ -133,9 +183,9 @@ public sealed class OutboxProcessor(
             timeProvider.GetUtcNow() - oldest);
     }
 
-    private static IIntegrationEvent Deserialize(OutboxMessage message)
-        => (IIntegrationEvent)(JsonSerializer.Deserialize(
+    private static IOutboxMessage Deserialize(OutboxMessage message)
+        => (IOutboxMessage)(JsonSerializer.Deserialize(
                 message.Content,
-                IntegrationEventTypeRegistry.Resolve(message.Type))
+                OutboxMessageTypeRegistry.Resolve(message.Type))
             ?? throw new InvalidOperationException($"Failed to deserialize outbox message {message.Id}."));
 }

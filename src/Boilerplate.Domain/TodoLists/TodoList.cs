@@ -77,7 +77,8 @@ public sealed class TodoList : AggregateRoot
         item.Complete();
         AddDomainEvent(new TodoItemCompletedDomainEvent(
             Id,
-            itemId));
+            itemId,
+            item.AssigneeUserId));
     }
 
     private TodoItem FindItem(Guid itemId)

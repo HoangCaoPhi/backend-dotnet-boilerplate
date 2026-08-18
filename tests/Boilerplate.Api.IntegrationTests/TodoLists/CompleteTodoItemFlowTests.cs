@@ -18,6 +18,7 @@ namespace Boilerplate.Api.IntegrationTests.TodoLists;
 public sealed class CompleteTodoItemFlowTests(ApiFactory apiFactory)
 {
     private const string ExchangeName = "TodoItemCompletedEmailRequestedIntegrationEvent";
+    private const string WebhookCommandName = "SendTodoItemCompletedWebhookCommand";
 
     [Fact]
     public async Task CompleteTodoItem_PublishesEmailRequestedIntegrationEvent()
@@ -46,37 +47,96 @@ public sealed class CompleteTodoItemFlowTests(ApiFactory apiFactory)
         using var scope = apiFactory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var row = await context.Set<OutboxMessage>().SingleAsync(
-            outboxMessage => outboxMessage.Content.Contains(item.Id.ToString()),
+            outboxMessage => outboxMessage.Type == ExchangeName && outboxMessage.Content.Contains(item.Id.ToString()),
             ct);
 
         row.Status.ShouldBe(OutboxMessageStatus.Published);
         row.Attempts.ShouldBe(1);
         message.BasicProperties.MessageId.ShouldBe(row.Id.ToString());
+        message.BasicProperties.Timestamp.UnixTime.ShouldBe(row.OccurredOn.ToUnixTimeSeconds());
+    }
+
+    [Fact]
+    public async Task CompleteTodoItem_WebhookCommandKeepsFailing_EmailEventStillPublishesExactlyOnce()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (list, item) = await SeedListWithItemAsync("Isolation test", ct);
+
+        using var connection = await CreateConnectionAsync(ct);
+        using var channel = await connection.CreateChannelAsync(cancellationToken: ct);
+        var queueName = await BindTemporaryQueueAsync(channel, ct);
+
+        await CompleteItemAsync(list.Id, item.Id, ct);
+
+        // Slow: the webhook host never resolves, so this waits out several 5s retry cycles.
+        await Task.Delay(
+            TimeSpan.FromSeconds(14),
+            ct);
+
+        var received = 0;
+        BasicGetResult? next;
+        while ((next = await channel.BasicGetAsync(
+                   queueName,
+                   autoAck: true,
+                   cancellationToken: ct)) is not null)
+        {
+            if (Encoding.UTF8.GetString(next.Body.ToArray()).Contains(item.Id.ToString()))
+            {
+                received++;
+            }
+        }
+
+        received.ShouldBe(1);
+
+        using var scope = apiFactory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var rows = await context.Set<OutboxMessage>()
+            .Where(outboxMessage => outboxMessage.Content.Contains(item.Id.ToString()))
+            .ToListAsync(ct);
+
+        rows.Count.ShouldBe(2);
+
+        var email = rows.Single(row => row.Type == ExchangeName);
+        email.Status.ShouldBe(OutboxMessageStatus.Published);
+        email.Attempts.ShouldBe(1);
+
+        var webhook = rows.Single(row => row.Type == WebhookCommandName);
+        webhook.Status.ShouldBeOneOf(OutboxMessageStatus.Failed, OutboxMessageStatus.DeadLettered);
+        webhook.Attempts.ShouldBeGreaterThan(1);
     }
 
     [Fact]
     public async Task OutboxClaim_SkipsRowsAlreadyLockedByAnotherWorker()
     {
         var ct = TestContext.Current.CancellationToken;
-        var (list, item) = await SeedListWithItemAsync("Skip locked test", ct);
-        await CompleteItemAsync(list.Id, item.Id, ct);
 
         using var firstScope = apiFactory.Services.CreateScope();
         using var secondScope = apiFactory.Services.CreateScope();
         var firstContext = firstScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var secondContext = secondScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
-        await using var firstTransaction = await firstContext.Database.BeginTransactionAsync(ct);
-        var firstClaim = await ClaimAsync(firstContext, ct);
-        firstClaim.ShouldNotBeEmpty();
+        // The background processor drains pending rows every 5s, so re-seed when it wins the race.
+        for (var attempt = 0; attempt < 4; attempt++)
+        {
+            var (list, item) = await SeedListWithItemAsync($"Skip locked test {attempt}", ct);
+            await CompleteItemAsync(list.Id, item.Id, ct);
 
-        await using var secondTransaction = await secondContext.Database.BeginTransactionAsync(ct);
-        var secondClaim = await ClaimAsync(secondContext, ct);
+            await using var firstTransaction = await firstContext.Database.BeginTransactionAsync(ct);
+            var firstClaim = await ClaimAsync(firstContext, ct);
 
-        secondClaim.Intersect(firstClaim).ShouldBeEmpty();
+            if (firstClaim.Count == 0)
+            {
+                continue;
+            }
 
-        await firstTransaction.RollbackAsync(ct);
-        await secondTransaction.RollbackAsync(ct);
+            await using var secondTransaction = await secondContext.Database.BeginTransactionAsync(ct);
+            var secondClaim = await ClaimAsync(secondContext, ct);
+
+            secondClaim.Intersect(firstClaim).ShouldBeEmpty();
+            return;
+        }
+
+        throw new Exception("The outbox never held a claimable row long enough to test locking.");
     }
 
     [Fact]

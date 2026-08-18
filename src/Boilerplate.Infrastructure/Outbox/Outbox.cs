@@ -1,5 +1,4 @@
 using System.Text.Json;
-using Boilerplate.Application.Common.IntegrationEvents;
 using Boilerplate.Application.Common.Outbox;
 using Boilerplate.Infrastructure.Persistence;
 using Boilerplate.SharedKernel;
@@ -11,12 +10,12 @@ public sealed class Outbox(
     IIdGenerator idGenerator,
     ITimeProvider timeProvider) : IOutbox
 {
-    public void Add(IIntegrationEvent integrationEvent)
+    public void Add(IOutboxMessage message)
         => context.Set<OutboxMessage>().Add(OutboxMessage.Create(
             idGenerator.NewId(),
-            integrationEvent.GetType().Name,
+            message.GetType().Name,
             JsonSerializer.Serialize(
-                integrationEvent,
-                integrationEvent.GetType()),
+                message,
+                message.GetType()),
             timeProvider.GetUtcNow()));
 }
