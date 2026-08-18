@@ -1,5 +1,6 @@
-using Boilerplate.Infrastructure.ExternalClients.Slack;
+using Boilerplate.Infrastructure.ExternalClients.Webhook;
 using Boilerplate.Infrastructure.Idempotency;
+using Boilerplate.Infrastructure.IntegrationEvents;
 using Boilerplate.Infrastructure.InternalClients.UserService;
 using Boilerplate.Infrastructure.Outbox;
 using Boilerplate.Infrastructure.Persistence;
@@ -20,9 +21,10 @@ public static class DependencyInjection
 
         services.AddPersistence(configuration);
         services.AddIdempotency();
-        services.AddOutbox(configuration);
+        services.AddOutbox();
+        services.AddIntegrationEvents(configuration);
         services.AddUserServiceClient(configuration);
-        services.AddSlackClient(configuration);
+        services.AddWebhookClient(configuration);
 
         return services;
     }

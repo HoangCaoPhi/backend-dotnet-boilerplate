@@ -10,6 +10,10 @@ public sealed class OutboxMessage
 
     public DateTimeOffset OccurredOn { get; private set; }
 
+    public OutboxMessageStatus Status { get; private set; }
+
+    public int Attempts { get; private set; }
+
     public DateTimeOffset? ProcessedOn { get; private set; }
 
     public string? Error { get; private set; }
@@ -29,9 +33,23 @@ public sealed class OutboxMessage
             Type = type,
             Content = content,
             OccurredOn = occurredOn,
+            Status = OutboxMessageStatus.Pending,
         };
 
-    public void MarkProcessed(DateTimeOffset processedOn) => ProcessedOn = processedOn;
+    public void MarkAttempted() => Attempts++;
 
-    public void MarkFailed(string error) => Error = error;
+    public void MarkPublished(DateTimeOffset processedOn)
+    {
+        Status = OutboxMessageStatus.Published;
+        ProcessedOn = processedOn;
+        Error = null;
+    }
+
+    public void MarkFailed(
+        string error,
+        int maxAttempts)
+    {
+        Status = Attempts >= maxAttempts ? OutboxMessageStatus.DeadLettered : OutboxMessageStatus.Failed;
+        Error = error;
+    }
 }

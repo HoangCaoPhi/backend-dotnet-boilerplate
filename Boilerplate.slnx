@@ -6,4 +6,9 @@
     <Project Path="src/Boilerplate.Infrastructure/Boilerplate.Infrastructure.csproj" />
     <Project Path="src/Boilerplate.SharedKernel/Boilerplate.SharedKernel.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Boilerplate.Domain.UnitTests/Boilerplate.Domain.UnitTests.csproj" />
+    <Project Path="tests/Boilerplate.Application.UnitTests/Boilerplate.Application.UnitTests.csproj" />
+    <Project Path="tests/Boilerplate.Api.IntegrationTests/Boilerplate.Api.IntegrationTests.csproj" />
+  </Folder>
 </Solution>

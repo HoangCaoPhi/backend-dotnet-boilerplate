@@ -35,8 +35,17 @@ paths:
 - High cohesion, low coupling: group tightly related code in one file/folder; minimize coupling
   between unrelated components; no dependency against the architecture direction.
 - Clean Code + YAGNI: no over-engineering, no unused abstractions/features.
-- Comments: short and plain, one line where possible, and only when the code can't say it itself
-  — a non-obvious *why*, a gotcha, a `ponytail:`/`TODO` marker. Never restate what the code does,
-  never write architecture rationale or decisions discussed in chat (those belong in
-  `.claude/rules/*.md`), never leave template-generated comments. No XML doc comments unless the
-  assembly is a published library.
+- Comments: default to none. Every comment is a small failure to express something in code, so
+  only add one when the code truly cannot say it itself. Litmus test before writing one — is this
+  explaining a fact about the world the code can't express (keep), or justifying why this design
+  was chosen over an alternative (delete, it's PR/rule-doc material, not code)? If the comment
+  would still make sense as a bullet in a PR description, it doesn't belong in the file.
+  - Never: restate what the code does, explain *what* instead of *why*, justify a design decision
+    or tradeoff discussed in chat (put that in `.claude/rules/*.md` instead, or nowhere), leave
+    template-generated comments, or add a comment a future reader could derive by re-reading the
+    two lines around it.
+  - Only: a hidden constraint or invariant the code can't self-document, a workaround for a
+    specific library/runtime quirk, a warning about a non-obvious consequence (e.g. "this test is
+    slow", "this order matters because X"), or a `ponytail:`/`TODO` marker.
+  - When one is warranted: one line, plain, no restating the code, no XML doc comments unless the
+    assembly is a published library.

@@ -1,5 +1,5 @@
-using Boilerplate.Domain.Common;
 using Mediator;
+using Boilerplate.Domain.Common;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace Boilerplate.Infrastructure.Persistence.Interceptors;
@@ -32,22 +32,12 @@ public sealed class DispatchDomainEventsInterceptor(IPublisher publisher) : Save
 
         while (true)
         {
-            var aggregates = context.ChangeTracker
-                .Entries<AggregateRoot>()
-                .Select(entry => entry.Entity)
-                .Where(aggregate => aggregate.DomainEvents.Count > 0)
-                .ToList();
+            var domainEvents = CollectAndClearDomainEvents(context);
 
-            if (aggregates.Count == 0)
+            if (domainEvents.Count == 0)
             {
                 return;
             }
-
-            var domainEvents = aggregates
-                .SelectMany(aggregate => aggregate.DomainEvents)
-                .ToList();
-
-            aggregates.ForEach(aggregate => aggregate.ClearDomainEvents());
 
             foreach (var domainEvent in domainEvents)
             {
@@ -56,5 +46,22 @@ public sealed class DispatchDomainEventsInterceptor(IPublisher publisher) : Save
                     cancellationToken);
             }
         }
+    }
+
+    private static IReadOnlyCollection<IDomainEvent> CollectAndClearDomainEvents(DbContext context)
+    {
+        var aggregates = context.ChangeTracker
+            .Entries<AggregateRoot>()
+            .Select(entry => entry.Entity)
+            .Where(aggregate => aggregate.DomainEvents.Count > 0)
+            .ToList();
+
+        var domainEvents = aggregates
+            .SelectMany(aggregate => aggregate.DomainEvents)
+            .ToList();
+
+        aggregates.ForEach(aggregate => aggregate.ClearDomainEvents());
+
+        return domainEvents;
     }
 }

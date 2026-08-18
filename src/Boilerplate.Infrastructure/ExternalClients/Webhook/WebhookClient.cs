@@ -1,9 +1,9 @@
 using System.Net.Http.Json;
-using Boilerplate.Application.Common.ExternalClients.Slack;
+using Boilerplate.Application.Common.ExternalClients.Webhook;
 
-namespace Boilerplate.Infrastructure.ExternalClients.Slack;
+namespace Boilerplate.Infrastructure.ExternalClients.Webhook;
 
-public sealed class SlackClient(HttpClient httpClient) : ISlackClient
+public sealed class WebhookClient(HttpClient httpClient) : IWebhookClient
 {
     public async Task NotifyAsync(
         string message,

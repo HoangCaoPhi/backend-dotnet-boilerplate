@@ -1,3 +1,5 @@
+using Boilerplate.Domain.Common;
+
 namespace Boilerplate.Domain.TodoLists.Events;
 
 public sealed record TodoItemCompletedDomainEvent(

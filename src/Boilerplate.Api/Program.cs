@@ -46,3 +46,5 @@ static IResult IssueDevToken(
 
     return Results.Ok(new { token });
 }
+
+public partial class Program;
